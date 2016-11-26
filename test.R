@@ -3,8 +3,8 @@ source("inference.R")
 
 Rcpp::sourceCpp("inference.cpp")
 
-data = generate_data1(N = 100, G = 500, K = 20, alpha = 1)
-res = infer_latent_factors(data$Y, data$X, 20, data$gamma, max_iter = 300)
+data = generate_data1(N = 100, G = 500, K = 20, alpha = 5)
+res = infer_latent_factors(data$Y, data$X, data$W, data$beta, 20, data$gamma, max_iter = 100)
 
 
 

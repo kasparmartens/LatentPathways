@@ -2,15 +2,16 @@ library(mvtnorm)
 
 matrix_list_sum = function(lst) Reduce("+", lst)
 
-infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100, burnin = max_iter/2){
+infer_latent_factors = function(Y, X, k_latent, gamma, alpha, max_iter = 100, burnin = max_iter/2){
   K = k_latent
   G = nrow(Y)
   N = ncol(Y)
   Ypred = matrix(0, nrow(Y), ncol(Y))
+  loglik = rep(0, max_iter - burnin)
   
   # gamma = rep(0.1, G)
   rho = 0.01
-  lambda = 100
+  lambda = 10
   # initialise Z
   Z = matrix(0, G, K)
   for(k in 1:K){
@@ -23,7 +24,11 @@ infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100, burnin = 
   
   for(i in 1:max_iter){
     # update Z
-    Z = update_Z(Y, Z, W, gamma, G, K, N)
+    Z = update_Z(Y, Z, W, gamma, G, K, N, alpha)
+    # a quick fix: numerical problems occur when Z has one empty latent factor
+    for(kk in which(colSums(Z) == 0)){
+      Z[sample(1:G, 1), kk] = 1
+    }
     
     # update W
     sigma_W_inv = lambda * diag(K) + matrix_list_sum(lapply(1:G, function(g){
@@ -45,8 +50,17 @@ infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100, burnin = 
     
     # update precision parameters
     
+    # loglikelihood
+    if(i > burnin){
+      m_k = colSums(Z)
+      loglik_Z = sum(log(alpha/K) + lgamma(m_k + alpha/K) + lgamma(G - m_k + 1) - lgamma(N + 1 + alpha/K))
+      loglik_W = sum(dnorm(W, outer(beta, colSums(X)), 1/sqrt(lambda), log=TRUE))
+      loglik_Y = sum(dnorm(Y, Z%*%W, 1/sqrt(gamma), log=TRUE))
+      loglik[i-burnin] = loglik_Z + loglik_W + loglik_Y
+    }
+    
     # prediction
     if(i > burnin) Ypred = Ypred + 1/(max_iter-burnin) * Z %*% W
   }
-  return(list(Z = Z, W = W, beta = beta, Ypred = Ypred))
+  return(list(Z = Z, W = W, beta = beta, Ypred = Ypred, loglik = loglik))
 }
