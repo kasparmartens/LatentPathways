@@ -2,10 +2,11 @@ library(mvtnorm)
 
 matrix_list_sum = function(lst) Reduce("+", lst)
 
-infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100){
+infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100, burnin = max_iter/2){
   K = k_latent
   G = nrow(Y)
   N = ncol(Y)
+  Ypred = matrix(0, nrow(Y), ncol(Y))
   
   # gamma = rep(0.1, G)
   rho = 0.01
@@ -43,7 +44,9 @@ infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100){
     beta = mu_beta + rnorm(K, 0, sqrt(sigma_beta))
     
     # update precision parameters
-    if(i>10) pheatmap(Z, cluster_cols=T, cluster_rows=T)
+    
+    # prediction
+    if(i > burnin) Ypred = Ypred + 1/(max_iter-burnin) * Z %*% W
   }
-  return(list(Z = Z, W = W, beta = beta))
+  return(list(Z = Z, W = W, beta = beta, Ypred = Ypred))
 }
