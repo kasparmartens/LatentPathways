@@ -10,7 +10,7 @@ infer_latent_factors = function(Y, X, k_latent, gamma, max_iter = 100, burnin = 
   
   # gamma = rep(0.1, G)
   rho = 0.01
-  lambda = 1
+  lambda = 100
   # initialise Z
   Z = matrix(0, G, K)
   for(k in 1:K){
