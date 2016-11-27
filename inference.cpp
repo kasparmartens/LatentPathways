@@ -38,26 +38,19 @@ arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gam
   //arma::imat Z(Z0.begin(), G, K, false);
   //arma::ivec genes_per_pathway = colSums(Z);
   
-  //arma::mat Y_pred0 = Z * W;
+  arma::ivec genes_per_pathway = colSums(Z);
   for(int k=0; k<K; k++){
     for(int g=0; g<G; g++){
-      arma::ivec genes_per_pathway = colSums(Z);
       // leave out gene g from the count
       int count = genes_per_pathway[k] - Z(g, k);
       double accept_prob =  calculate_accept_prob(g, k, Z, W, Y, gamma, G, K, N, count, alpha);
+      genes_per_pathway[k] = count;
       // set Z[g, k] to 1 with probability accept_prob
       double u = R::runif(0, 1);
       if(u < accept_prob){
-        // set Z(g, k) to 1
-        // if(Z(g, k) == 0){
-        //   genes_per_pathway[k] += 1;
-        // }
         Z(g, k) = 1;
+        genes_per_pathway[k] += 1;
       } else{
-        // set Z(g, k) to 1
-        // if(Z(g, k) == 1){
-        //   genes_per_pathway[k] -= 1;
-        // }
         Z(g, k) = 0;
       }
     }

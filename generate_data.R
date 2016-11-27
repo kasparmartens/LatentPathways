@@ -14,5 +14,5 @@ generate_data1 = function(N, G, K, alpha = 1){
     W[k, ] = rnorm(N, beta[k] * colSums(X), sqrt(1/lambda))
   }
   Y = Z %*% W + rnorm(N*G, 0, sqrt(1/gamma))
-  return(list(X = X, Y = Y, Z = Z, W = W, beta = beta, gamma = gamma))
+  return(list(X = X, Y = Y, Z = Z, W = W, beta = beta, gamma = gamma, K = K, alpha = alpha))
 }
