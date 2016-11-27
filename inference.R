@@ -2,17 +2,21 @@ library(mvtnorm)
 library(reshape2)
 
 source("helpers.R")
+Rcpp::sourceCpp("inference.cpp")
 
 infer_latent_factors = function(Y, X, k_latent, alpha, max_iter = 100, burnin = max_iter/2, keep_Y_trace = TRUE, which_genes = NULL, which_samples = NULL){
   K = k_latent
   G = nrow(Y)
   N = ncol(Y)
   Ypred_mean = matrix(0, nrow(Y), ncol(Y))
+  Z_mean = matrix(0, G, K)
+  W_mean = matrix(0, K, N)
+  beta_mean = rep(0, K)
   loglik = rep(0, max_iter - burnin)
   Ypred_trace = NULL
   if(keep_Y_trace){
-    if(is.null(which_genes)) which_genes = 1:G
-    if(is.null(which_samples)) which_samples = 1:N
+    if(is.null(which_genes)) which_genes = sample(1:G, 5)
+    if(is.null(which_samples)) which_samples = sample(1:N, 5)
     Ypred_trace = matrix(0, length(which_genes)*length(which_samples), max_iter - burnin)
   }
   
@@ -36,8 +40,9 @@ infer_latent_factors = function(Y, X, k_latent, alpha, max_iter = 100, burnin = 
     # update Z
     Z = update_Z(Y, Z, W, gamma, G, K, N, alpha)
     # a quick fix: numerical problems occur when Z has one empty latent factor
-    for(kk in which(colSums(Z) == 0)){
-      Z[sample(1:G, 1), kk] = 1
+    if(any(colSums(Z) == 0)){
+      for(kk in which(colSums(Z) == 0))
+        Z[sample(1:G, 1), kk] = 1
     }
     
     # update W
@@ -45,7 +50,7 @@ infer_latent_factors = function(Y, X, k_latent, alpha, max_iter = 100, burnin = 
       gamma[g] * outer(Z[g, ], Z[g, ])
     }))
     sigma_W = solve(sigma_W_inv)
-    temp_W = lambda * beta * colSums(X) + matrix_list_sum(lapply(1:G, function(g){
+    temp_W = lambda * outer(beta, colSums(X)) + matrix_list_sum(lapply(1:G, function(g){
       gamma[g] * outer(Z[g, ], Y[g, ])
     }))
     mu_W = sigma_W %*% temp_W
@@ -78,8 +83,11 @@ infer_latent_factors = function(Y, X, k_latent, alpha, max_iter = 100, burnin = 
       loglik[i-burnin] = loglik_Z + loglik_W + loglik_Y
     }
     
-    # prediction
+    # save traces
     if(i > burnin){
+      Z_mean = Z_mean + 1/(max_iter-burnin) * Z
+      W_mean = W_mean + 1/(max_iter-burnin) * W
+      beta_mean = beta_mean + 1/(max_iter-burnin) * beta
       Ypred_mean = Ypred_mean + 1/(max_iter-burnin) * Ypred0
       if(keep_Y_trace) Ypred_trace[, i-burnin] = melt(Ypred0[which_genes, which_samples, drop=FALSE])$value
       # cat(sprintf("range gamma (%1.3f, %1.3f), mean(gamma): %1.3f, lambda: %1.3f\n", min(gamma), max(gamma), mean(gamma), lambda))
@@ -87,5 +95,5 @@ infer_latent_factors = function(Y, X, k_latent, alpha, max_iter = 100, burnin = 
   }
   if(keep_Y_trace) Ypred_trace = postprocess_Y_trace(Y, Ypred_trace, which_genes, which_samples)
   
-  return(list(Z = Z, W = W, beta = beta, Ypred = Ypred_mean, Ypred_trace = Ypred_trace, loglik = loglik))
+  return(list(Yobs = Y, Z = Z_mean, W = W_mean, beta = beta, Ypred = Ypred_mean, Ypred_trace = Ypred_trace, loglik = loglik, iter = (burnin+1):max_iter))
 }
