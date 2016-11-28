@@ -24,8 +24,8 @@ double calculate_accept_prob(int g, int k, arma::imat& Z, arma::mat& W, arma::ma
     pred0 = pred1 - W.row(k);
   }
   arma::rowvec y = Y.row(g);
-  double loglik0 = sum(-square(y-pred0)/gamma[g]);
-  double loglik1 = sum(-square(y-pred1)/gamma[g]);
+  double loglik0 = sum(-square(y-pred0))/gamma[g];
+  double loglik1 = sum(-square(y-pred1))/gamma[g];
   double logz = log((count + alpha/K) / (G - count));
   double z = logz + loglik1 - loglik0;
   double accept_prob = 1.0 / (1.0 + exp(-z));

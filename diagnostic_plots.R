@@ -9,13 +9,13 @@ plot_log_posterior = function(obj){
   return(p)
 }
 
-scatterplot_observed_vs_predicted = function(obj){
+scatterplot_observed_vs_predicted = function(obj, alpha = 1){
   y.m = melt(obj$Yobs)
   ypred.m = melt(obj$Ypred)
   df = data.frame(gene = y.m$Var1, y = y.m$value, ypred = ypred.m$value)
   
   p = ggplot(df, aes(y, ypred)) + 
-    geom_point() + 
+    geom_point(alpha = alpha) + 
     geom_abline(intercept=0, slope=1, col="red", linetype="dashed") +
     theme_bw() + 
     labs(x = "Observed y", y = "Predicted y")
