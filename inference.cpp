@@ -13,14 +13,14 @@ arma::ivec colSums(const arma::imat & X){
 }
 
 // [[Rcpp::export]]
-double calculate_accept_prob(int g, int k, arma::imat& Z, arma::mat& W, arma::mat& Y, NumericVector gamma, int G, int K, int N, int count, double alpha){
+double calculate_accept_prob(int g, int k, arma::imat& Z, arma::mat& W, arma::mat& Y, NumericVector gamma, NumericVector mu, int G, int K, int N, int count, double alpha){
   arma::rowvec pred0(N), pred1(N);
   // leave out latent factor k from prediction Y_pred(g, _)
   if(Z(g, k) == 0){
-    pred0 = Z.row(g) * W;
+    pred0 = Z.row(g) * W + mu[g];
     pred1 = pred0 + W.row(k);
   } else{
-    pred1 = Z.row(g) * W;
+    pred1 = Z.row(g) * W + mu[g];
     pred0 = pred1 - W.row(k);
   }
   arma::rowvec y = Y.row(g);
@@ -34,7 +34,7 @@ double calculate_accept_prob(int g, int k, arma::imat& Z, arma::mat& W, arma::ma
 }
 
 // [[Rcpp::export]]
-arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gamma, int G, int K, int N, double alpha) {
+arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gamma, NumericVector mu, int G, int K, int N, double alpha) {
   //arma::imat Z(Z0.begin(), G, K, false);
   //arma::ivec genes_per_pathway = colSums(Z);
   
@@ -43,7 +43,7 @@ arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gam
     for(int g=0; g<G; g++){
       // leave out gene g from the count
       int count = genes_per_pathway[k] - Z(g, k);
-      double accept_prob =  calculate_accept_prob(g, k, Z, W, Y, gamma, G, K, N, count, alpha);
+      double accept_prob =  calculate_accept_prob(g, k, Z, W, Y, gamma, mu, G, K, N, count, alpha);
       genes_per_pathway[k] = count;
       // set Z[g, k] to 1 with probability accept_prob
       double u = R::runif(0, 1);
@@ -57,6 +57,4 @@ arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gam
   }
   return Z;
 }
-
-
 

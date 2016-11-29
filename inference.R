@@ -42,10 +42,12 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
   W = matrix(rnorm(K*N), K, N)
   # initialise beta
   beta = rnorm(K, 0, 1)
-  
+  # initialise mu_Y
+  intercept_Y = rep(0, G)
+
   for(i in 1:max_iter){
     # update Z
-    Z = update_Z(Y, Z, W, gamma, G, K, N, alpha)
+    Z = update_Z(Y, Z, W, gamma, intercept_Y, G, K, N, alpha)
     # a quick fix: numerical problems occur when Z has one empty latent factor
     if(any(colSums(Z) == 0)){
       for(kk in which(colSums(Z) == 0))
@@ -74,8 +76,14 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
     noise = t(rmvnorm(N, rep(0, K), sigma_W))
     W = mu_W + noise
     
+    # intercept_Y
+    resid = Y - Z %*% W # note without the intercept
+    sigma_int = 1/(rho + N * gamma)
+    mu_int = sigma_int * rowSums(gamma * resid)
+    intercept_Y = rnorm(G, mu_int, sqrt(sigma_int))
+
     # Ypred without noise
-    Ypred0 = Z %*% W
+    Ypred0 = Z %*% W + intercept_Y
     
     # update beta
     x_colsums = colSums(X)
