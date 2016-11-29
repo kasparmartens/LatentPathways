@@ -18,6 +18,7 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
   Z_mean = matrix(0, G, K)
   W_mean = matrix(0, K, N)
   beta_mean = rep(0, K)
+  beta0_mean = rep(0, K)
   loglik_trace = rep(0, max_iter - burnin)
   alpha_trace = rep(0, max_iter - burnin)
   Ypred_trace = NULL
@@ -42,6 +43,7 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
   W = matrix(rnorm(K*N), K, N)
   # initialise beta
   beta = rnorm(K, 0, 1)
+  beta0 = rnorm(K, 0, 1)
   # initialise mu_Y
   intercept_Y = rep(0, G)
 
@@ -69,7 +71,7 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
       gamma[g] * outer(Z[g, ], Z[g, ])
     }))
     sigma_W = solve(sigma_W_inv)
-    temp_W = lambda * outer(beta, colSums(X)) + matrix_list_sum(lapply(1:G, function(g){
+    temp_W = lambda * outer(beta0, rep(1, N)) + lambda * outer(beta, colSums(X)) + matrix_list_sum(lapply(1:G, function(g){
       gamma[g] * outer(Z[g, ], Y[g, ])
     }))
     mu_W = sigma_W %*% temp_W
@@ -90,10 +92,14 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
     sigma_beta = 1 / (rho + sum(lambda * x_colsums**2))
     mu_beta = sigma_beta * colSums(lambda * x_colsums * t(W))
     beta = mu_beta + rnorm(K, 0, sqrt(sigma_beta))
+    # beta0
+    sigma_beta = 1 / (rho + lambda * N)
+    mu_beta = sigma_beta * rowSums(lambda * (W - outer(beta, x_colsums)))
+    beta0 = mu_beta + rnorm(K, 0, sqrt(sigma_beta))
     
     # update precision parameters
     a_lambda = a0 + 0.5*K*N
-    b_lambda = b0 + 0.5*sum((W - outer(beta, x_colsums))**2)
+    b_lambda = b0 + 0.5*sum((W - beta0 - outer(beta, x_colsums))**2)
     lambda = rgamma(1, a_lambda, b_lambda)
     a_gamma = a0 + 0.5*N
     b_gamma = b0 + 0.5*rowSums((Y - Ypred0)**2)
@@ -105,13 +111,14 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
       Z_mean = Z_mean + 1/(max_iter-burnin) * Z
       W_mean = W_mean + 1/(max_iter-burnin) * W
       beta_mean = beta_mean + 1/(max_iter-burnin) * beta
+      beta0_mean = beta0_mean + 1/(max_iter-burnin) * beta0
       Ypred_mean = Ypred_mean + 1/(max_iter-burnin) * Ypred0
       if(keep_Y_trace) Ypred_trace[, i-burnin] = melt(Ypred0[which_genes, which_samples, drop=FALSE])$value
       # cat(sprintf("range gamma (%1.3f, %1.3f), mean(gamma): %1.3f, lambda: %1.3f\n", min(gamma), max(gamma), mean(gamma), lambda))
       
       # loglikelihood
       loglik_Z = calculate_IBP_prob(alpha, m_k, K, G, log = TRUE)
-      loglik_W = sum(dnorm(W, outer(beta, x_colsums), 1/sqrt(lambda), log=TRUE))
+      loglik_W = sum(dnorm(W, beta0 + outer(beta, x_colsums), 1/sqrt(lambda), log=TRUE))
       loglik_Y = sum(dnorm(Y, Ypred0, 1/sqrt(gamma), log=TRUE))
       loglik_trace[i-burnin] = loglik_Z + loglik_W + loglik_Y
     }
@@ -123,7 +130,8 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
   }
   if(keep_Y_trace) Ypred_trace = postprocess_Y_trace(Y, Ypred_trace, which_genes, which_samples)
   
-  return(list(Yobs = Y, Z = Z_mean, W = W_mean, beta = beta, 
+  return(list(Yobs = Y, Z = Z_mean, W = W_mean, 
+              beta = beta_mean, beta0 = beta0_mean, 
               Ypred = Ypred_mean, Ypred_trace = Ypred_trace, 
               loglik = loglik_trace, alpha = alpha_trace, 
               iter = (burnin+1):max_iter))
