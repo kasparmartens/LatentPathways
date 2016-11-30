@@ -1,4 +1,5 @@
 library(reshape2)
+library(dplyr)
 library(ggplot2)
 
 plot_log_posterior = function(obj){
@@ -13,6 +14,7 @@ scatterplot_observed_vs_predicted = function(obj, alpha = 1){
   y.m = melt(obj$Yobs)
   ypred.m = melt(obj$Ypred)
   df = data.frame(gene = y.m$Var1, y = y.m$value, ypred = ypred.m$value)
+  if(nrow(df) > 1e5) df = sample_n(df, 1e5)
   
   p = ggplot(df, aes(y, ypred)) + 
     geom_point(alpha = alpha) + 
