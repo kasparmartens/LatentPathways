@@ -13,28 +13,33 @@ arma::ivec colSums(const arma::imat & X){
 }
 
 // [[Rcpp::export]]
-double calculate_accept_prob(int g, int k, arma::imat& Z, arma::mat& W, arma::mat& Y, NumericVector gamma, NumericVector mu, int G, int K, int N, int count, double alpha){
+bool calculate_accept_prob(int g, int k, arma::mat& Z, arma::mat& W, arma::mat& Y, NumericVector gamma, NumericVector mu, NumericVector lambda, int G, int K, int N, int count, double alpha){
   arma::rowvec pred0(N), pred1(N);
   // leave out latent factor k from prediction Y_pred(g, _)
-  if(Z(g, k) == 0){
-    pred0 = Z.row(g) * W + mu[g];
-    pred1 = pred0 + W.row(k);
-  } else{
-    pred1 = Z.row(g) * W + mu[g];
-    pred0 = pred1 - W.row(k);
-  }
-  arma::rowvec y = Y.row(g);
-  double loglik0 = sum(-square(y-pred0))/gamma[g];
-  double loglik1 = sum(-square(y-pred1))/gamma[g];
+  Z(g, k) = 0;
+  pred0 = Z.row(g) * W + mu[g];
+  // compute \sum_{i=1}^N W_{ki}^2
+  double sum_W2 = sum(square(W.row(k)));
+  double denom = lambda[k] + gamma[g] * sum_W2;
+  double log_det = log(lambda[k]) - log(denom);
+  double mean = gamma[g] / denom * dot(Y.row(g) - pred0, W.row(k));
+  double precision = denom;
+  double log_lik = precision * mean * mean;
   double logz = log((count + alpha/K) / (G - count));
-  double z = logz + loglik1 - loglik0;
+  double z = logz + 0.5*log_det + 0.5*log_lik;
   double accept_prob = 1.0 / (1.0 + exp(-z));
-  //printf("logz: %1.2f, loglik0: %1.2f, loglik1: %1.2f, z: %1.2f, prob: %1.3f\n", logz, loglik0, loglik1, z, accept_prob);
-  return accept_prob;
+  //printf("accept prob: %1.3f, mean: %1.3f, precision: %1.3f\n", accept_prob, mean, precision);
+  
+  double u = R::runif(0, 1);
+  bool accepted = (u < accept_prob);
+  if(accepted){
+    Z(g, k) = R::rnorm(mean, 1/sqrt(precision));
+  }
+  return accepted;
 }
 
 // [[Rcpp::export]]
-arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gamma, NumericVector mu, int G, int K, int N, double alpha) {
+arma::mat update_Z(arma::mat& Y, arma::imat Z, arma::mat ZZ, arma::mat & W, NumericVector gamma, NumericVector mu, NumericVector lambda, int G, int K, int N, double alpha) {
   //arma::imat Z(Z0.begin(), G, K, false);
   //arma::ivec genes_per_pathway = colSums(Z);
   
@@ -43,19 +48,16 @@ arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gam
     for(int g=0; g<G; g++){
       // leave out gene g from the count
       int count = genes_per_pathway[k] - Z(g, k);
-      double accept_prob =  calculate_accept_prob(g, k, Z, W, Y, gamma, mu, G, K, N, count, alpha);
+      bool accepted =  calculate_accept_prob(g, k, ZZ, W, Y, gamma, mu, lambda, G, K, N, count, alpha);
       genes_per_pathway[k] = count;
       // set Z[g, k] to 1 with probability accept_prob
-      double u = R::runif(0, 1);
-      if(u < accept_prob){
+      if(accepted){
         Z(g, k) = 1;
         genes_per_pathway[k] += 1;
-      } else{
-        Z(g, k) = 0;
       }
     }
   }
-  return Z;
+  return ZZ;
 }
 
 // [[Rcpp::export]]
