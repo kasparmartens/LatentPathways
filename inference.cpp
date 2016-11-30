@@ -58,3 +58,15 @@ arma::imat update_Z(arma::mat& Y, arma::imat Z, arma::mat & W, NumericVector gam
   return Z;
 }
 
+// [[Rcpp::export]]
+NumericMatrix fast_outer_product_sum(NumericVector gamma, NumericMatrix A, NumericMatrix B, int nrows, int ncols, int length){
+  NumericMatrix out(nrows, ncols);
+  for(int j=0; j<ncols; j++){
+    for(int i=0; i<nrows; i++){
+      for(int g=0; g<length; g++){
+        out(i, j) += gamma[g] * A(g, i) * B(g, j);
+      }
+    }
+  }
+  return out;
+}

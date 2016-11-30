@@ -67,13 +67,9 @@ infer_latent_factors = function(Y, X, K, alpha = 5, max_iter = 100, burnin = max
     }
     
     # update W
-    sigma_W_inv = lambda * diag(K) + matrix_list_sum(lapply(1:G, function(g){
-      gamma[g] * outer(Z[g, ], Z[g, ])
-    }))
+    sigma_W_inv = lambda * diag(K) + fast_outer_product_sum(gamma, Z, Z, K, K, G)
     sigma_W = solve(sigma_W_inv)
-    temp_W = lambda * outer(beta0, rep(1, N)) + lambda * outer(beta, colSums(X)) + matrix_list_sum(lapply(1:G, function(g){
-      gamma[g] * outer(Z[g, ], Y[g, ])
-    }))
+    temp_W = lambda * outer(beta0, rep(1, N)) + lambda * outer(beta, colSums(X)) + fast_outer_product_sum(gamma, Z, Y, K, N, G)
     mu_W = sigma_W %*% temp_W
     noise = t(rmvnorm(N, rep(0, K), sigma_W))
     W = mu_W + noise
