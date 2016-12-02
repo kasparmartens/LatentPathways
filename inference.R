@@ -106,7 +106,9 @@ infer_latent_factors = function(Y, X, Y_test, X_test, K, alpha = 5, max_iter = 1
 
     # Ypred without noise
     Ypred0 = ZZ %*% W + intercept_g
-    Ypred = Ypred0 + rnorm(G*N, 0, 1/sqrt(gamma))
+    # predict Y_test
+    W_test = beta0 + outer(beta, x_test_colsums) + rnorm(K*Ntest, 0, 1/sqrt(lambda_W))
+    Ypred0_test = intercept_g + ZZ %*% W_test
     
     # update beta
     sigma_beta = 1 / (rho + sum(lambda_W * x_colsums**2))
@@ -134,8 +136,8 @@ infer_latent_factors = function(Y, X, Y_test, X_test, K, alpha = 5, max_iter = 1
       intercept_mean = intercept_mean + 1/(max_iter-burnin) * intercept_g
       beta_mean = beta_mean + 1/(max_iter-burnin) * beta
       beta0_mean = beta0_mean + 1/(max_iter-burnin) * beta0
-      Ypred_mean = Ypred_mean + 1/(max_iter-burnin) * Ypred
-      if(keep_Y_trace) Ypred_trace[, i-burnin] = melt(Ypred[which_genes, which_samples1, drop=FALSE])$value
+      Ypred_mean = Ypred_mean + 1/(max_iter-burnin) * Ypred0
+      if(keep_Y_trace) Ypred_trace[, i-burnin] = melt(Ypred0[which_genes, which_samples1, drop=FALSE])$value
       # cat(sprintf("range gamma (%1.3f, %1.3f), mean(gamma): %1.3f, lambda_W: %1.3f\n", min(gamma), max(gamma), mean(gamma), lambda_W))
       
       # loglikelihood
@@ -144,13 +146,9 @@ infer_latent_factors = function(Y, X, Y_test, X_test, K, alpha = 5, max_iter = 1
       loglik_Y = sum(dnorm(Y, Ypred0, 1/sqrt(gamma), log=TRUE))
       loglik_trace[i-burnin] = loglik_Z + loglik_W + loglik_Y
       
-      
-      # predict Y_test
-      W_test = beta0 + outer(beta, x_test_colsums) + rnorm(K*Ntest, 0, 1/sqrt(lambda_W))
-      Ypred0_test = intercept_g + ZZ %*% W_test
-      Ypred_test = Ypred0_test + rnorm(G*Ntest, 0, 1/sqrt(gamma))
-      Ypred_test_mean = Ypred_test_mean + 1/(max_iter-burnin) * Ypred_test
-      if(keep_Y_trace) Ypred_test_trace[, i-burnin] = melt(Ypred_test[which_genes, which_samples2, drop=FALSE])$value
+      # Ytest prediction
+      Ypred_test_mean = Ypred_test_mean + 1/(max_iter-burnin) * Ypred0_test
+      if(keep_Y_trace) Ypred_test_trace[, i-burnin] = melt(Ypred0_test[which_genes, which_samples2, drop=FALSE])$value
       
       # test loglikelihood
       loglik_W = sum(dnorm(W_test, beta0 + outer(beta, x_test_colsums), 1/sqrt(lambda_W), log=TRUE))
@@ -161,8 +159,8 @@ infer_latent_factors = function(Y, X, Y_test, X_test, K, alpha = 5, max_iter = 1
     if(i %% 100 == 0){
       cat("Iter", i, "\n")
       if(i > burnin){
-        train_acc = cor(as.numeric(Ypred), as.numeric(Y))
-        test_acc = cor(as.numeric(Ypred_test), as.numeric(Y_test))
+        train_acc = cor(as.numeric(Ypred0), as.numeric(Y))
+        test_acc = cor(as.numeric(Ypred0_test), as.numeric(Y_test))
         cat("\tTrain acc:", train_acc, "Test acc", test_acc, "\n")
       }
       flush.console()
@@ -173,8 +171,8 @@ infer_latent_factors = function(Y, X, Y_test, X_test, K, alpha = 5, max_iter = 1
     Ypred_test_trace = postprocess_Y_trace(Y, Ypred_test_trace, which_genes, which_samples2)
   }
   
-  acc_train = cor(as.numeric(Ypred), as.numeric(Y))
-  acc_test = cor(as.numeric(Ypred_test), as.numeric(Y_test))
+  acc_train = cor(as.numeric(Ypred_mean), as.numeric(Y))
+  acc_test = cor(as.numeric(Ypred_test_mean), as.numeric(Y_test))
   
   return(list(Yobs = Y, Yobs_test = Y_test, 
               acc_train = acc_train, acc_test = acc_test, 
